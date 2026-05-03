@@ -98,7 +98,6 @@ pub fn perturbation(temp:f64, alpha:f64, geom_theory_file:&mut File,
     ).collect();
   let x0: Mat<f64> = Mat::from_fn(x0_complex.nrows(), x0_complex.ncols(),
     |i, j| x0_complex[(i, j)].re);
-  eprintln!("{}", x0_complex.ncols());
   let dim = init_sa_matrix.nrows();
   debug_assert!(dim == init_sa_matrix.ncols(), "init_sa_matrix has wrong dimensions");
   let p_pows: Vec<Mat<f64>> = {
