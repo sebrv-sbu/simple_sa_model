@@ -107,7 +107,7 @@ pub fn perturbation(temp:f64, alpha:f64, geom_theory_file:&mut File,
   };
   let mut x= 0.0;
   x+=(&x0 * &p_pows[0])[(0,0)];
-  writeln!(geom_theory_out, "{}", x).unwrap();
+  writeln!(geom_theory_out, "0 {}", x).unwrap();
   for n in 1..steps{
     x = 0.0;
     x+=(&x0 * &p_pows[n])[(0,0)];
