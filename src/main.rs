@@ -1,10 +1,9 @@
 mod anneal;
 mod perturbation;
 mod eigentools;
-mod exact_solns;
 use crate::anneal::*;
 use crate::perturbation::*;
-use crate::exact_solns::*;
+use crate::eigentools::*;
 use faer::{Mat, c64};
 use std::fs::File;
 use clap::{Parser, Subcommand};
@@ -51,7 +50,11 @@ enum Mode{
     #[arg(short = 'p', long="perturbation_file", 
       default_value="perturbation_cum_prob.txt")]
     perturbation_file:PathBuf
-
+  },
+  #[command(about = "Output data necessary for computing parallel efficiency")]
+  Parallel{
+    #[arg(short = 'p', long = "target_probability", default_value="0.75")]
+    target_p:f64
   }
 }
   
@@ -84,6 +87,10 @@ fn main() {
       let mut eigen_file = File::create(eigen_file)
         .unwrap();
       eigen_evolution(temp, alpha, &mut eigen_file, &graph, &x0, steps);
+    }
+    Mode::Parallel{ target_p } => {
+      let (alpha, k) = coarse_grain_search(temp, target_p, &graph, &x0);
+      println!("Computed {} as optimal alpha after {} iterations", alpha, k)
     }
   }
 }

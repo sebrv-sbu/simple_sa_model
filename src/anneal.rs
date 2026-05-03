@@ -123,7 +123,7 @@ fn geom_anneal(graph:&Graph, start_point:usize, start_temp:f64,
     x_k=anneal(graph, x_k, temp);
     temp = temp * alpha;
     steps = steps + 1;
-    if temp < 1e-8{
+    if temp < 1e-10{
       return None;
     }
   }

@@ -42,6 +42,69 @@ impl Index{
   }
 }
 
+pub fn single_step_stationary_theory(c_lambda:&mut Vec<f64>, lambdas:&Vec<f64>,
+  u:&Mat<c64>) -> f64{
+  let n = c_lambda.len();
+  let yi:f64 = (0..n)
+    .map(|i| c_lambda[i] * u.col(i)[0].re)
+    .sum();
+  c_lambda.iter_mut()
+    .zip(lambdas.iter())
+    .for_each(|(c,lambda)| *c = *c * lambda);
+  yi
+}
+
+pub fn coarse_grain_search(init_temp:f64, p:f64, graph:&Graph, 
+  x0:&Mat<c64>)->(f64, usize){
+  /* There may be a binary search method here but we don't know yet that the *
+   * function has only one local minimum, so for now we do it the naive way. */
+  let sa_hit_matrix = graph.to_hitting_matrix(init_temp, 0);
+  let eigen = sa_hit_matrix
+    .transpose() /* since we want row eigenvectors */
+    .to_owned()
+    .eigen()
+    .unwrap();
+  let u = eigen
+    .U()
+    .to_owned()
+    .one_normalize(); /* M^T=USU^{-1} with S as eigenvalues */
+
+  let n = x0.ncols();
+
+  let lu = u.to_owned().partial_piv_lu();
+  let y = lu.solve(&x0.transpose());
+  let mut c_lambda: Vec<f64> = (0..n).map(|i| {
+    debug_assert!(y[(i,0)].im.abs() < 1e-8, "unexpected imaginary component: {}", 
+      y[(i,0)].im);
+    y[(i,0)].re
+  }).collect();
+  let mut upper_bound = 0;
+
+  let lambdas:Vec<f64> =  (0..n)
+    .map(|i| { 
+      debug_assert!(eigen.S()[i].im.abs() < 1e-8); 
+      eigen.S()[i].re
+    })
+  .collect();
+  let x0_float = Mat::from_fn(x0.nrows(), x0.ncols(), |i,j| x0[(i,j)].re);
+  
+  while single_step_stationary_theory(&mut c_lambda, &lambdas, &u) < p
+  { upper_bound += 1; }
+  for k in 0..=upper_bound{
+    for alpha_100 in 0..100{
+      let alpha = alpha_100 as f64/100.0;
+      let exact_p:f64 = (&x0_float * (0..k)
+        .map(|i| graph.to_hitting_matrix(init_temp * alpha.powi(i as i32), 0))
+        .fold(Mat::identity(n, n), |total_soln, mat_i|{
+          total_soln * mat_i
+        }))[(0,0)];
+      if exact_p >= p{
+        return (alpha, k)
+        }
+      }
+    }
+  (1.0, upper_bound)
+}
 pub fn stationary_theory(temp:f64, stationary_theory_file:&mut File,
   graph:&Graph, x0:&Mat<c64>, steps:usize){
 
@@ -76,17 +139,10 @@ pub fn stationary_theory(temp:f64, stationary_theory_file:&mut File,
   
   let mut stationary_out = BufWriter::new(stationary_theory_file);
   for step in 0..steps{
-    let y0:f64 = (0..n)
-      .map(|i| c_lambda[i]*u.col(i)[0].re)
-      .sum();
-    writeln!(stationary_out,"{} {}", step, y0).unwrap();
-    c_lambda.iter_mut()
-      .zip(lambdas.iter())
-      .for_each(|(c,lambda)| *c = *c * lambda);
-      
+    let yi = single_step_stationary_theory(&mut c_lambda, &lambdas, &u);
+    writeln!(stationary_out,"{} {}", step, yi).unwrap();
   }
 }
-
 
 pub fn perturbation(temp:f64, alpha:f64, geom_theory_file:&mut File,
   graph:&Graph, x0_complex:&Mat<c64>, steps:usize, order:usize){
