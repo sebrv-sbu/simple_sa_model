@@ -115,7 +115,7 @@ fn anneal(graph:&Graph, i:usize, temp:f64) -> usize{
 }
 
 fn geom_anneal(graph:&Graph, start_point:usize, start_temp:f64, 
-  alpha:f64) -> usize{
+  alpha:f64) -> Option<usize>{
   let mut x_k:usize = start_point;
   let mut temp:f64 = start_temp;
   let mut steps:usize = 0;
@@ -123,8 +123,11 @@ fn geom_anneal(graph:&Graph, start_point:usize, start_temp:f64,
     x_k=anneal(graph, x_k, temp);
     temp = temp * alpha;
     steps = steps + 1;
+    if temp < 1e-8{
+      return None;
+    }
   }
-  steps
+  Some(steps)
 }
 
 fn stationary_anneal(graph:&Graph, start_point:usize, temp:f64) -> usize {
@@ -154,7 +157,10 @@ pub fn gather_data(graph:&Graph, start_vec:Vec<f64>,
     let start_point = i-1;
     let geom_hit = geom_anneal(&graph, start_point, temp, alpha);
     let stationary_hit = stationary_anneal(&graph, start_point, temp);
-    writeln!(geom_out, "{}", geom_hit).unwrap();
+    match geom_hit {
+      Some(steps) => writeln!(geom_out, "{}", steps).unwrap(),
+      None => writeln!(geom_out, "NA").unwrap()
+    }
     writeln!(stationary_out, "{}", stationary_hit).unwrap();
   }
 }
