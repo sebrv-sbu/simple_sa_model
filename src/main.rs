@@ -77,7 +77,8 @@ fn main() {
     stationary_theory(temp, &mut stationary_theory_file, &graph, &x0, steps);
     let mut perturbation_theory_file = File::create(perturbation_file)
       .unwrap();
-    perturbation(temp, alpha, &mut perturbation_theory_file, &graph, steps, order);
+    perturbation(temp, alpha, &mut perturbation_theory_file, &graph, &x0, 
+      steps, order);
     },
     Mode::Eigeninfo{ eigen_file } => {
       let mut eigen_file = File::create(eigen_file)

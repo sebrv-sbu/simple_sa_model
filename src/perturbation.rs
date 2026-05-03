@@ -89,14 +89,16 @@ pub fn stationary_theory(temp:f64, stationary_theory_file:&mut File,
 
 
 pub fn perturbation(temp:f64, alpha:f64, geom_theory_file:&mut File,
-  graph:&Graph, steps:usize, order:usize){
+  graph:&Graph, x0_complex:&Mat<c64>, steps:usize, order:usize){
   let mut geom_theory_out = BufWriter::new(geom_theory_file);
   let init_sa_matrix = graph.to_hitting_matrix(temp, 0);
   let es:Vec<Mat<f64>> = 
     (0..=steps).map(
       |i| graph.to_hitting_matrix(temp*alpha.powi(i as i32), 0) - &init_sa_matrix 
     ).collect();
-
+  let x0: Mat<f64> = Mat::from_fn(x0_complex.nrows(), x0_complex.ncols(),
+    |i, j| x0_complex[(i, j)].re);
+  eprintln!("{}", x0_complex.ncols());
   let dim = init_sa_matrix.nrows();
   debug_assert!(dim == init_sa_matrix.ncols(), "init_sa_matrix has wrong dimensions");
   let p_pows: Vec<Mat<f64>> = {
@@ -105,11 +107,11 @@ pub fn perturbation(temp:f64, alpha:f64, geom_theory_file:&mut File,
     v
   };
   let mut x= 0.0;
-  x+=p_pows[0][(3,0)];
+  x+=(&x0 * &p_pows[0])[(0,0)];
   writeln!(geom_theory_out, "{}", x).unwrap();
   for n in 1..steps{
     x = 0.0;
-    x+=p_pows[n][(3,0)];
+    x+=(&x0 * &p_pows[n])[(0,0)];
     for k in 1..=min(order, n){
       let mut index = Index::new(n, k);
       x+=index.fold(0.0, |acc, combo| {
@@ -121,7 +123,7 @@ pub fn perturbation(temp:f64, alpha:f64, geom_theory_file:&mut File,
           } else { n - 1 - combo[i] };
           prod = prod * &p_pows[gap];
         }
-      acc + prod[(3,0)]
+      acc + (&x0 *&prod)[(0,0)]
       });
     }
     writeln!(geom_theory_out, "{} {}", n, x).unwrap();
