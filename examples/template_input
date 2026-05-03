@@ -1,0 +1,44 @@
+$n_points_temp
+4 1.442695
+
+$begin_score_matrix
+0.0 0.5 0.5 0.0
+0.5 1.0 0.0 0.5
+0.5 0.0 1.0 0.5
+0.0 0.5 0.5 2.0
+
+$begin_edge_weights_garbageasdasdasdassfasd
+0 0 0
+0 1 0.5
+0 2 0.5
+1 1 1
+1 0 0.5
+1 3 0.5
+2 2 1
+2 0 0.5
+2 3 0.5 
+3 3 2
+3 1 0.5
+3 2 0.5
+
+$initial_state_vector
+0.0
+0.0
+0.0
+1.0
+
+$initial_state
+3
+
+
+$comments
+the diagonal corresponds to the energy level of each point. Then, each other
+edge corresponds to the weight. The way graph is implemented, the probability
+of picking a neighbour is $A_{ij}/sum_{k=0, k\neq i}^{n-1}A_{ij}$. So if 
+you replace each 0.5 with a 1.0 above then it will work just fine.
+
+The code will take in either a score matrix or an edge_weight matrix. 
+Note this is a directed graph, so you have to include both $a->b$ and $b->a$.
+lines that say $a->a$ are treated as the energy of the graph.
+Also, it looks for "$begin_edge_weights" at the start of the line: any extra
+garbage at the end is not processed. Same with all lines.
