@@ -38,7 +38,7 @@ enum Mode{
   #[command(about = "Show info about eigenvalues and vectors")]
   Eigeninfo{
     #[arg(short = 'f', long="eigen_file", default_value="eigen_evolution.txt")]
-    eigen_file: PathBuf
+    eigen_file: PathBuf,
   },
   #[command(about = "Run perturbation series")]
   Perturbation{
@@ -55,6 +55,12 @@ enum Mode{
   Parallel{
     #[arg(short = 'p', long = "target_probability", default_value="0.75")]
     target_p:f64
+  },
+  Lambda2{
+    low_temp:f64,
+    high_temp:f64,
+    #[arg(short = 'f', long = "lambda_2_file", default_value="lambda_2.txt")]
+    lambda_2_file:PathBuf
   }
 }
   
@@ -87,10 +93,15 @@ fn main() {
       let mut eigen_file = File::create(eigen_file)
         .unwrap();
       eigen_evolution(temp, alpha, &mut eigen_file, &graph, &x0, steps);
-    }
+    },
     Mode::Parallel{ target_p } => {
       let (alpha, k) = coarse_grain_search(temp, target_p, &graph, &x0);
       println!("Computed {} as optimal alpha after {} iterations", alpha, k)
-    }
+    },
+    Mode::Lambda2{ low_temp, high_temp, lambda_2_file }=> {
+      let mut out_file = File::create(lambda_2_file)
+        .expect("Could not create file for lambda_2 info");
+      lambda_2_range(high_temp, low_temp, &mut out_file, &graph, steps);
+    },
   }
 }

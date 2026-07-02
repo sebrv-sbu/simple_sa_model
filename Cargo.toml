@@ -7,4 +7,6 @@ edition = "2024"
 clap = { version = "4.6.1", features = ["derive"] }
 faer = "0.24.0"
 nalgebra = "0.34.2"
+num = "0.4.3"
+num-traits = "0.2.19"
 rand = "0.10.1"

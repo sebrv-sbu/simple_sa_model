@@ -2,6 +2,7 @@ use faer::{Mat, linalg::solvers::Solve, c64};
 use crate::anneal::*;
 use std::io::{BufWriter, Write};
 use std::fs::File;
+use num_traits::NumCast;
 
 struct EigenDecomposition{
   mass_vector:Vec<c64>,
@@ -30,6 +31,40 @@ impl OneNormalize for Mat<c64>{
         .iter_mut()
         .for_each(|x| *x = *x/c64::new(norm,0.0))
     }
+  }
+}
+
+pub trait Return2ndEigInfo<T1: NumCast, T2:NumCast>{
+  fn return_v_and_lambda_2(&self) -> (Mat<T1>, T2);
+}
+
+impl Return2ndEigInfo<c64, f64> for Mat<f64>{
+  fn return_v_and_lambda_2(&self) -> (Mat<c64>, f64){
+    let n = self.nrows();
+    assert!(self.ncols() == n, "Did not supply a square matrix!");
+    let eigs = self
+      .to_owned()
+      .map(|x| c64::new(*x, 0.0))
+      .to_owned()
+      .eigen()
+      .expect("Could not find eigenvalues");
+    let eigvals: Vec<c64> = eigs
+      .S()
+      .column_vector()
+      .iter()
+      .copied()
+      .collect();
+
+    let mut indices:Vec<usize> = (0..n).collect();
+    indices.sort_by(|&a, &b| {
+      eigvals[b].norm().partial_cmp(&eigvals[a].norm())
+        .expect("Could not sort eigenvalues")
+     });
+    let lambda_2: f64 = eigvals[indices[1]].re;
+    let v_2 = eigs
+      .U()
+      .col(indices[1]);
+    (Mat::from_fn(v_2.nrows(), 1, |i, _| v_2[i]), lambda_2)
   }
 }
 
@@ -97,7 +132,7 @@ pub fn eigen_evolution(init_temp:f64, alpha:f64, output_file: &mut File,
   for col in 0..curr_vec.nrows(){
     write!(buffed_output, "\teigval_{}\tmass_{}\tdiff_{}", col+1, col+1, col+1).unwrap();
     for row in 0..curr_vec.nrows(){
-      write!(buffed_output,"\tvec{}_{}", col+1, row+1).unwrap();
+      write!(buffed_output,"\tvec{}_{}", col+1, row).unwrap();
     }
   }
   writeln!(buffed_output).unwrap();
@@ -154,4 +189,58 @@ pub fn eigen_evolution(init_temp:f64, alpha:f64, output_file: &mut File,
     curr_vec = sa_hit_matrix * &curr_vec;
     temp *= alpha;
   }
+}
+
+
+pub fn lambda_2_range(high_temp:f64, low_temp:f64, output_file: &mut File,
+  graph:&Graph, n:usize) 
+  {
+  let delta_t:f64 = (high_temp - low_temp)/n as f64;
+  let (v_2_inf, lambda_2_inf) = graph
+    .to_hitting_matrix(f64::INFINITY, 0)
+    .transpose()
+    .to_owned()
+    .return_v_and_lambda_2();
+  let mut buffed_output = BufWriter::new(output_file);
+  write!(buffed_output, "T\tlambda_2").expect("Could not write to output file");
+  for row in 0..v_2_inf.nrows(){
+    write!(buffed_output, "vec2_{}\t", row).expect("Could not write to output file");
+  }
+  writeln!(buffed_output).expect("Could not write to output file");
+  write!(buffed_output, "{}\t{}", f64::INFINITY, lambda_2_inf)
+    .expect("Could not write to output file");
+  for row in 0..v_2_inf.nrows(){
+    write!(buffed_output, "\t{}", v_2_inf[(row, 0)].re)
+      .expect("Could not write to output file");
+  }
+  writeln!(buffed_output).expect("Could not write to output file");
+  for i in 0..n{
+    let temp = high_temp - (delta_t * i as f64);
+    let (v_2, lambda_2) = graph
+      .to_hitting_matrix(temp, 0)
+      .transpose()
+      .to_owned()
+      .return_v_and_lambda_2();
+    write!(buffed_output, "{}\t{}", temp, lambda_2)
+      .expect("Could not write to output file");
+
+    for row in 0..v_2.nrows(){
+     write!(buffed_output, "\t{}", v_2[(row, 0)].re)
+      .expect("Could not write to output file");
+    }
+    writeln!(buffed_output).expect("Could not write to output file");
+  }
+  let (v_2_0, lambda_2_0) = graph
+    .to_hitting_matrix(0.0, 0)
+    .transpose()
+    .to_owned()
+    .return_v_and_lambda_2();
+  write!(buffed_output, "{}\t{}", 0.0, lambda_2_0)
+    .expect("Could not write to output file");
+
+  for row in 0..v_2_0.nrows(){
+    write!(buffed_output, "\t{}", v_2_0[(row, 0)].re)
+     .expect("Could not write to output file");
+  }
+  writeln!(buffed_output).expect("Could not write to output file");
 }
