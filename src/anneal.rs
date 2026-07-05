@@ -4,7 +4,6 @@ use std::fs::File;
 use std::io::{BufWriter, Write, BufReader, BufRead};
 use std::path::Path;
 
-
 struct Edge{
   neighbour: usize,
   weight: f64
@@ -21,13 +20,13 @@ pub struct Graph{
 }
 
 impl Graph{
-  fn new() -> Self{
+  pub fn new() -> Self{
     Graph { nodes: Vec::new() }
   }
-  fn add_node(&mut self, cost:f64){
+  pub fn add_node(&mut self, cost:f64){
     self.nodes.push(Node { cost: cost, edges: Vec::new(), sum_weights: 0.0 });
   }
-  fn add_edge(&mut self, from:usize, to:usize, weight:f64){
+  pub fn add_edge(&mut self, from:usize, to:usize, weight:f64){
     self.nodes[from]
       .edges
       .push(Edge { neighbour: to, weight: weight } );
@@ -98,6 +97,13 @@ impl Graph{
     let p = self.to_matrix(temp);
     &p+&r*(&identity-&p)
   }
+  pub fn lowest_node(&self) -> usize{
+    self.nodes.iter()
+      .enumerate()
+      .min_by(|(_, x), (_, y)| x.cost.partial_cmp(&y.cost).unwrap())
+      .expect("Cannot find min of 0 nodes")
+      .0
+  }
 }
 
 fn anneal(graph:&Graph, i:usize, temp:f64) -> usize{
@@ -161,7 +167,7 @@ pub fn gather_data(graph:&Graph, start_vec:Vec<f64>,
       Some(steps) => writeln!(geom_out, "{}", steps).unwrap(),
       None => writeln!(geom_out, "NA").unwrap()
     }
-    writeln!(stationary_out, "{}", stationary_hit).unwrap();
+   writeln!(stationary_out, "{}", stationary_hit).unwrap();
   }
 }
 

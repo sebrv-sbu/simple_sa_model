@@ -1,0 +1,55 @@
+$temp
+1.4
+$dim_sizes
+2 3 3
+$edge_weights_start
+1
+1
+1
+-1
+-1
+-1
+1
+1
+1
+-1
+-1
+-1
+1
+1
+1
+-1
+-1
+-1
+
+$mu
+1
+
+$external_magnetic_field
+1
+2
+3
+1
+2
+3
+4
+5
+6
+
+$starting_configs
+00 00 0.5
+ff ff 0.5
+
+comments:
+Will read weights into positions in ascending order. 
+It reads weights as 
+
+2d ising 
+
+   |    |    |
+-- o -- o -- o --
+   |    |    |
+-- o -- o -- o --
+   |    |    |
+-- o -- o -- o --
+   |    |    |
