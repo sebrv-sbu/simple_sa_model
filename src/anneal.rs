@@ -97,7 +97,8 @@ impl Graph{
     let p = self.to_matrix(temp);
     &p+&r*(&identity-&p)
   }
-  pub fn lowest_node(&self) -> usize{
+
+  pub fn lowest_node(&self) -> usize {
     self.nodes.iter()
       .enumerate()
       .min_by(|(_, x), (_, y)| x.cost.partial_cmp(&y.cost).unwrap())
