@@ -154,7 +154,7 @@ fn main() {
     perturbation(temp, alpha, &mut perturbation_theory_file, &graph, &x0, 
       steps, order);
         }
-        Model::IsingInit{ising, temp} => {
+        Model::IsingInit{ising: _, temp: _} => {
           panic!("Perturbation not functional for Ising yet!");
         }
       }
@@ -196,19 +196,19 @@ fn main() {
       let (alpha, k) = coarse_grain_search(temp, target_p, &graph, &x0);
       println!("Computed {} as optimal alpha after {} iterations", alpha, k)
         }
-        Model::IsingInit{ising, temp} => {
+        Model::IsingInit{ising: _, temp: _} => {
           panic!("Mode not functional for Ising yet!");
     }
       }
     },
     Mode::Lambda2{ low_temp, high_temp, lambda_2_file }=> {
       match model{
-        Model::GraphInit { graph, temp, x_vec:_, x0:_ } => {
+        Model::GraphInit { graph, temp: _, x_vec:_, x0:_ } => {
       let mut out_file = File::create(lambda_2_file)
         .expect("Could not create file for lambda_2 info");
       lambda_2_range(high_temp, low_temp, &mut out_file, &graph, steps);
         }
-        Model::IsingInit{ising, temp} => {
+        Model::IsingInit{ising: _, temp: _} => {
           panic!("Mode not functional for Ising yet!");
       }
         }
