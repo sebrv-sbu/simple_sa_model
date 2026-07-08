@@ -120,7 +120,7 @@ fn main() {
     let mut stationary_file = File::create(stationary_file).unwrap();
     
     match model{
-      Model::GraphInit { graph, temp, x_vec, x0 } => {
+      Model::GraphInit { graph, temp, x_vec, x0:_ } => {
         gather_data(
           &graph, 
           x_vec, 
@@ -145,7 +145,7 @@ fn main() {
   },
   Mode::Perturbation { order, stationary_file, perturbation_file }=> {
       match model {
-        Model::GraphInit{graph, temp, x_vec, x0} => {
+        Model::GraphInit{graph, temp, x_vec:_, x0} => {
     let mut stationary_theory_file = File::create(stationary_file)
       .unwrap();
     stationary_theory(temp, &mut stationary_theory_file, &graph, &x0, steps);
@@ -161,19 +161,38 @@ fn main() {
   },
     Mode::Eigeninfo{ eigen_file } => {
       match model{
-        Model::GraphInit { graph, temp, x_vec, x0 } => {
+        Model::GraphInit { graph, temp, x_vec:_, x0 } => {
       let mut eigen_file = File::create(eigen_file)
         .unwrap();
-      eigen_evolution(temp, alpha, &mut eigen_file, &graph, &x0, steps);
+      eigen_evolution(temp, alpha, &mut eigen_file, &graph, &x0, steps, None);
         }
-        Model::IsingInit{ising, temp} =>{
-          panic!("EigenInfo not functional for Ising yet!");
-    }
+        Model::IsingInit{ mut ising, temp } =>{
+          let graph = ising.to_graph();
+          let x_vec_ising = ising.start_configs_x_vec();
+          let x0 :Mat<c64>;
+          match &x_vec_ising{
+            Some(x_vec) => {
+              x0 = Mat::<c64>::from_fn(x_vec.len(), 1, |i, _|
+                  c64::new(x_vec[i],0.0))
+                .transpose()
+                .to_owned();
+          }
+            None =>{
+              assert!(ising.n_points <= 64, "Cannot do analysis on 
+                ising with more than 64 nodes");
+              x0 = Mat::<c64>::full(2usize.pow(ising.n_points as u32),
+              1, c64::new((1/2usize.pow(ising.n_points as u32)) as f64, 0.0))
+            }
+          }
+      let mut eigen_file = File::create(eigen_file)
+        .unwrap();
+      eigen_evolution(temp, alpha, &mut eigen_file, &graph, &x0, steps, None);
+        }
       }
     },
     Mode::Parallel{ target_p } => {
       match model{
-        Model::GraphInit { graph, temp, x_vec, x0 } => {
+        Model::GraphInit { graph, temp, x_vec:_, x0 } => {
       let (alpha, k) = coarse_grain_search(temp, target_p, &graph, &x0);
       println!("Computed {} as optimal alpha after {} iterations", alpha, k)
         }
@@ -184,7 +203,7 @@ fn main() {
     },
     Mode::Lambda2{ low_temp, high_temp, lambda_2_file }=> {
       match model{
-        Model::GraphInit { graph, temp, x_vec, x0 } => {
+        Model::GraphInit { graph, temp, x_vec:_, x0:_ } => {
       let mut out_file = File::create(lambda_2_file)
         .expect("Could not create file for lambda_2 info");
       lambda_2_range(high_temp, low_temp, &mut out_file, &graph, steps);

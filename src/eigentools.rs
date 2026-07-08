@@ -119,15 +119,22 @@ impl EigenDecomposition{
   }
 }
 
-pub fn eigen_evolution(init_temp:f64, alpha:f64, output_file: &mut File, 
-  graph:&Graph, x0:&Mat<c64>, steps:usize){
-
+pub fn eigen_evolution(
+  init_temp:f64,
+  alpha:f64,
+  output_file: &mut File, 
+  graph:&Graph,
+  x0:&Mat<c64>,
+  steps:usize,
+  global_min:Option<usize>)
+{
   let mut buffed_output = BufWriter::new(output_file);
   let mut temp = init_temp;
   let mut curr_vec = x0.clone().transpose().to_owned();
   let mut curr_eigvecs: Option<Mat<c64>> = None;
   let mut prev_eigvecs: Option<Mat<c64>>;
- 
+  let sink = global_min.unwrap_or(graph.lowest_node());
+
   write!(buffed_output, "step").unwrap();
   for col in 0..curr_vec.nrows(){
     write!(buffed_output, "\teigval_{}\tmass_{}\tdiff_{}", col+1, col+1, col+1).unwrap();
@@ -140,7 +147,7 @@ pub fn eigen_evolution(init_temp:f64, alpha:f64, output_file: &mut File,
 
   for i in 0..steps{
     let sa_hit_matrix = graph
-      .to_hitting_matrix(temp, 0)
+      .to_hitting_matrix(temp, sink)
       .transpose()
       .to_owned()
       .map(|x| c64::new(*x, 0.0))

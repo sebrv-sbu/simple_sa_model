@@ -10,15 +10,21 @@ struct IsingEdge{
   weight: f64,
 }
 
+struct StartingConfig{
+  config:Vec<bool>,
+  weight:f64
+}
+
 pub struct Ising{
   dim: usize,
   sizes: Vec<usize>,
-  n_points: usize,
+  pub n_points: usize,
   pub spins: Vec<bool>,
   edges: Vec<IsingEdge>,
   mu:f64,
   magnetic_field:Vec<f64>,
-  pub cost: f64
+  pub cost: f64,
+  starting_configs: Option<Vec<StartingConfig>>
 }
 
 macro_rules! weight_coord_base {
@@ -50,7 +56,8 @@ impl Ising {
     let mu = 0.0;
     let spins = Vec::<bool>::new();
     let edges = Vec::<IsingEdge>::new();
-    Ising{ dim, sizes, n_points, cost, magnetic_field, mu, spins, edges}
+    Ising{ dim, sizes, n_points, cost, magnetic_field, mu, spins, edges,
+    starting_configs: None}
   } 
   #[inline(always)]
   fn get_edge(&self, vertex:usize, edge_index: usize) -> &IsingEdge{
@@ -93,6 +100,11 @@ impl Ising {
   fn set_magnetic_field(&mut self, magnetic_field: Vec<f64>){
     self.magnetic_field = magnetic_field;
   }
+  fn set_starting_configs(&mut self, 
+    starting_config: Option<Vec<StartingConfig>>){
+    self.starting_configs = starting_config;
+  }
+
   fn to_coord(&self, node:usize) -> Vec<usize>{
     let mut node_copy = node;
     let mut coord = vec![0; self.sizes.len()];
@@ -147,7 +159,23 @@ impl Ising {
       cost + magnetic + interaction / 2.0
     });
   }
-  fn init_spins_rand(&mut self){
+  fn init_spins(&mut self){
+    let Some(configs) = &self.starting_configs else {
+      self.init_spins_unif();
+      return;
+    };
+    let sum_floats = configs.iter()
+     .fold(0.0, |acc, config| acc + config.weight);
+    let bound = rand::rng().random_range(0.0..sum_floats);
+    let mut accumulated_weight = 0.0;
+    let mut i = 0;
+    while accumulated_weight + configs[i].weight < bound{
+      accumulated_weight += configs[i].weight;
+      i+=1;
+    }
+    self.spins = configs[i].config.clone();
+  }
+  fn init_spins_unif(&mut self){
     self.spins = (0..self.n_points)
       .map(|_| rand::rng().random_bool(0.5))
       .collect();
@@ -215,7 +243,7 @@ impl Ising {
     }
     (best_cost, hitting_time, best_config)
   }
-  fn to_graph(&mut self) -> Graph{
+  pub fn to_graph(&mut self) -> Graph{
     let mut graph = Graph::new();
     assert!(self.n_points <= 64, "Error: Cannot convert
       a model with more than 64 points into a graph");
@@ -243,6 +271,22 @@ impl Ising {
       }
     }
     graph
+  }
+  pub fn start_configs_x_vec(&self) -> Option<Vec<f64>>{
+    if let Some(start_configs) = &self.starting_configs{
+      assert!(self.n_points < 64, "Cannot Create Start Vector
+        for > 64 ising nodes");
+      let mut x_vec = vec![0.0; 2usize.pow(self.n_points as u32)];
+      let tot_weight = start_configs.iter()
+        .fold(0.0, |acc, config| acc + config.weight);
+      for start_config in start_configs{
+        x_vec[config_to_u64(&start_config.config)[0] as usize] 
+          += start_config.weight / tot_weight;
+      }
+      Some(x_vec)
+    } else {
+      None
+    }
   }
 }
 
@@ -366,10 +410,70 @@ pub fn from_ising_file(path: impl AsRef<Path>) -> (Ising, f64) {
         .expect("Error reading magnetic field entry")
     ).collect()
   );
+  for line in lines.by_ref(){
+    let line = line.unwrap();
+    if line.starts_with("$starting_configs") {
+      in_section = true;
+      break;
+    }
+  }
+  let starting_configs: Option<Vec<StartingConfig>>;
+  if in_section {
+    let mut starting_configs_base = Vec::<StartingConfig>::new();
+    let hex_length = ising_instance.n_points.div_ceil(8);
+    while let Some(line) = lines.next() {
+      let line = line.expect("Error reading line");
+      let mut line = line.split_whitespace();
+      let mut hex = Vec::<u8>::new();
+      for _ in 0..hex_length{
+        hex.push(
+          u8::from_str_radix(
+            line.next()
+              .expect("Error: Not enough entries for hex code of starting 
+                config"),
+            16
+          )
+          .expect("Error: No integer detected")
+        );
+        }
+      let config_u64:Vec<u64> = hex.chunks(8)
+        .map(|chunk| {
+          chunk.iter()
+            .enumerate()
+            .fold(0u64, |acc, (i, &byte)|{
+              acc | ((byte as u64) << i*8)
+            })
+          })
+        .collect();
+      let starting_config = u64_to_config(config_u64, ising_instance.n_points);
+      let prob = line.next()
+        .expect("Could not find probability associated with starting 
+          configuration")
+        .parse::<f64>()
+        .expect("Probability for starting configuration not a float");
+      //DEBUG 
+      #[cfg(debug_assertions)]
+      {
+        if prob > 1.0{
+          println!("Warning: Weight greater than 1.");
+          }
+      }
+      starting_configs_base.push(StartingConfig{
+        config:starting_config, weight:prob
+      })
+      }
+    starting_configs=Some(starting_configs_base)
+  }
+  else {
+    println!("Warning: Starting Configurations not found. Defaulting
+      to random Starting Configurations");
+    starting_configs = None;
+  }
+  ising_instance.set_starting_configs(starting_configs);
   (ising_instance, temp)
 }
 
-fn config_to_u64(config:Vec<bool>)->Vec<u64>{
+fn config_to_u64(config: &[bool])->Vec<u64>{
   config.chunks(64)
     .map(|chunk| {
       chunk.iter()
@@ -385,16 +489,40 @@ fn config_to_u64(config:Vec<bool>)->Vec<u64>{
   .collect()
 }
 
+fn u64_to_config(uvec_rep:Vec<u64>, n_points:usize)->Vec<bool>{
+  uvec_rep.iter()
+    .flat_map(|&uvec_chunk| {
+      let mut config_section = vec![false; 64];
+      for i in 0..64{
+        config_section[i] = (uvec_chunk & (1u64 << i)) != 0;
+        }
+      config_section
+      })
+  .take(n_points)
+  .collect()
+}
+
 pub fn gather_ising_data(ising: &mut Ising, temp:f64,
   alpha:f64, trials:usize, geom_file:&mut File, stationary_file:&mut File)
 {
   let mut geom_out = BufWriter::new(geom_file);
   let mut stationary_out = BufWriter::new(stationary_file);
+  #[cfg(debug_assertions)]
+  {
+    let test_configs=vec![true; ising.n_points];
+    println!("Debug Info: All 1s: {}", config_to_u64(&test_configs).iter()
+      .flat_map(|&num| num.to_le_bytes())
+      .take((test_configs.len() + 7)/8)
+      .map(|byte| format!("{:02x}", byte))
+      .collect::<Vec<String>>()
+      .join(" ")
+      )
+  }
   writeln!(geom_out, "cost\thitting_time\tconfig").unwrap();
   writeln!(stationary_out, "cost\thitting_time\tconfig").unwrap();
 
   for _ in 0..trials{
-    ising.init_spins_rand();
+    ising.init_spins();
     let spins = ising.spins.clone();
     let (geom_cost, geom_hit, geom_config) =
       ising.geom_anneal(temp,alpha, 1000);
@@ -403,7 +531,7 @@ pub fn gather_ising_data(ising: &mut Ising, temp:f64,
       ising.stationary_anneal(temp, 1000);
     let geom_len = geom_config.len();
     let stationary_len = stationary_config.len();
-    let geom_str: String = config_to_u64(geom_config)
+    let geom_str: String = config_to_u64(&geom_config)
       .iter()
       .flat_map(|&num| num.to_le_bytes())
       .take((geom_len + 7)/8)
@@ -412,7 +540,7 @@ pub fn gather_ising_data(ising: &mut Ising, temp:f64,
       .join(" ");
     writeln!(geom_out, "{geom_cost}\t{geom_hit}\t{geom_str}").unwrap();
     
-    let stationary_str: String = config_to_u64(stationary_config)
+    let stationary_str: String = config_to_u64(&stationary_config)
       .iter()
       .flat_map(|&num| num.to_le_bytes())
       .take((stationary_len + 7)/8)
