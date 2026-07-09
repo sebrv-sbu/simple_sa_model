@@ -38,7 +38,7 @@ $external_magnetic_field
 
 $starting_configs
 00 00 0.5
-ff ff 0.5
+00 01 0.5
 
 comments:
 Will read weights into positions in ascending order. 
