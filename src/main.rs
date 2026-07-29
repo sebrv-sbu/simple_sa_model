@@ -2,28 +2,17 @@ mod anneal;
 mod perturbation;
 mod eigentools;
 mod ising;
+mod model_types;
 use crate::anneal::*;
 use crate::perturbation::*;
 use crate::eigentools::*;
 use crate::ising::*;
+use crate::model_types::*;
 use faer::{Mat, c64};
 use std::fs::File;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use std::path::Path;
-
-enum Model{
-  GraphInit{
-    graph:Graph,
-    temp: f64,
-    x_vec: Vec<f64>,
-    x0: Mat<c64>
-  },
-  IsingInit{
-    ising:Ising,
-    temp:f64,
-  }
-}
 
 #[derive(Parser)]
 #[command(about = "Toy Simulated Annealing Modeller")]
@@ -111,7 +100,7 @@ fn main() {
   let input_file = args.input_file;
   let steps = args.steps;
   let alpha = args.alpha;
-  let model = Model::from_file(&args.model, input_file);
+  let mut model = Model::from_file(&args.model, input_file);
 
 
   match args.mode{
@@ -160,46 +149,19 @@ fn main() {
       }
   },
     Mode::Eigeninfo{ eigen_file } => {
-      match model{
-        Model::GraphInit { graph, temp, x_vec:_, x0 } => {
-      let mut eigen_file = File::create(eigen_file)
-        .unwrap();
-      eigen_evolution(temp, alpha, &mut eigen_file, &graph, &x0, steps, None);
-        }
-        Model::IsingInit{ mut ising, temp } =>{
-          let graph = ising.to_graph();
-          let x_vec_ising = ising.start_configs_x_vec();
-          let x0 :Mat<c64>;
-          match &x_vec_ising{
-            Some(x_vec) => {
-              x0 = Mat::<c64>::from_fn(x_vec.len(), 1, |i, _|
-                  c64::new(x_vec[i],0.0))
-                .transpose()
-                .to_owned();
-          }
-            None =>{
-              assert!(ising.n_points <= 64, "Cannot do analysis on 
-                ising with more than 64 nodes");
-              x0 = Mat::<c64>::full(2usize.pow(ising.n_points as u32),
-              1, c64::new((1/2usize.pow(ising.n_points as u32)) as f64, 0.0))
-            }
-          }
-      let mut eigen_file = File::create(eigen_file)
-        .unwrap();
-      eigen_evolution(temp, alpha, &mut eigen_file, &graph, &x0, steps, None);
-        }
-      }
+      let mut eigen_file = File::create(eigen_file).unwrap();
+      let Model::GraphInit{graph, temp, x0, x_vec:_} = model.to_graph() else {
+        panic!("to_graph not implemented properly for this variant");
+      };
+
+      eigen_evolution(*temp, alpha, &mut eigen_file, &graph, &x0, steps, None);
     },
     Mode::Parallel{ target_p } => {
-      match model{
-        Model::GraphInit { graph, temp, x_vec:_, x0 } => {
-      let (alpha, k) = coarse_grain_search(temp, target_p, &graph, &x0);
+      let Model::GraphInit{graph, temp, x0, x_vec:_} = model.to_graph() else {
+        panic!("to_graph not implemented properly for this variant");
+      };
+      let (alpha, k) = coarse_grain_search(*temp, target_p, &graph, &x0);
       println!("Computed {} as optimal alpha after {} iterations", alpha, k)
-        }
-        Model::IsingInit{ising: _, temp: _} => {
-          panic!("Mode not functional for Ising yet!");
-    }
-      }
     },
     Mode::Lambda2{ low_temp, high_temp, lambda_2_file }=> {
       match model{

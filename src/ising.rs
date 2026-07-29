@@ -1,6 +1,7 @@
 use rand::RngExt;
 use crate::anneal::*;
 use std::fs::File;
+use faer::{Mat, c64};
 use std::io::{BufWriter, Write, BufReader, BufRead};
 use std::path::Path;
 
@@ -288,7 +289,7 @@ impl Ising {
       None
     }
   }
-}
+  }
 
 pub fn from_ising_file(path: impl AsRef<Path>) -> (Ising, f64) {
   let file = File::open(path).unwrap();
@@ -423,14 +424,17 @@ pub fn from_ising_file(path: impl AsRef<Path>) -> (Ising, f64) {
     let hex_length = ising_instance.n_points.div_ceil(8);
     while let Some(line) = lines.next() {
       let line = line.expect("Error reading line");
+      if line.trim().is_empty() {
+        break;
+      }
       let mut line = line.split_whitespace();
       let mut hex = Vec::<u8>::new();
       for _ in 0..hex_length{
         hex.push(
           u8::from_str_radix(
             line.next()
-              .expect("Error: Not enough entries for hex code of starting 
-                config"),
+              .expect(
+ "Error: Not enough entries for hex code of starting config"),
             16
           )
           .expect("Error: No integer detected")
@@ -550,5 +554,8 @@ pub fn gather_ising_data(ising: &mut Ising, temp:f64,
     writeln!(stationary_out, 
       "{stationary_cost}\t{stationary_hit}\t{stationary_str}").unwrap();
   }
+}
 
-}     
+fn infinity_lambda_2_and_approx() -> (f64, f64){
+
+}
